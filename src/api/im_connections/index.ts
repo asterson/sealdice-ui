@@ -179,17 +179,28 @@ export function postAddLagrange(
   account: string,
   signServerName: string,
   signServerVersion: string,
-  isGocq: boolean,
 ) {
   return request<DiceConnection>(
     'post',
     'addLagrange',
-    { account, signServerName, signServerVersion, isGocq },
+    { account, signServerName, signServerVersion },
     'json',
     {
       timeout: 65000,
     },
   );
+}
+
+export function postAddMilky(token: string, wsGateway: string, restGateway: string) {
+  return request<DiceConnection>('post', 'addMilky', { token, wsGateway, restGateway }, 'json', {
+    timeout: 65000,
+  });
+}
+
+export function postAddMilkyInternal(uin: number, clientMode: string) {
+  return request<DiceConnection>('post', 'addMilkyInternal', { uin, clientMode }, 'json', {
+    timeout: 65000,
+  });
 }
 
 export function postConnectionDel(id: string) {
@@ -250,7 +261,6 @@ export interface DiceConnection {
   groupNum: number;
   cmdExecutedNum: number;
   cmdExecutedLastTime: number;
-  onlineTotalTime: number;
   isPublic: boolean;
 
   adapter: AdapterQQ;
@@ -280,6 +290,7 @@ interface AdapterQQ {
   isReverse: boolean;
   reverseAddr: string;
   builtinMode: 'gocq' | 'lagrange' | 'lagrange-gocq';
+  built_in_mode: string; // Milky
   signServerVer: string;
   signServerName: string;
 }
@@ -288,6 +299,8 @@ enum goCqHttpStateCode {
   InLogin = 1,
   InLoginQrCode = 2,
   InLoginBar = 3,
+  MilkyLoginConnected = 4,
+  MilkyLoginFailed = 5,
   InLoginVerifyCode = 6,
   InLoginDeviceLock = 7,
   LoginSuccessed = 10,

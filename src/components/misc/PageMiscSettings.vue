@@ -207,6 +207,7 @@
       </template>
       <el-checkbox v-model="config.botExtFreeSwitch" label="开启" />
     </el-form-item>
+
     <el-form-item>
       <template #label>
         <div>
@@ -249,6 +250,18 @@
         </div>
       </template>
       <el-checkbox v-model="config.ignoreUnaddressedBotCmd" label="开启" />
+    </el-form-item>
+
+    <el-form-item v-if="!config.ignoreUnaddressedBotCmd">
+      <template #label>
+        <div>
+          <span>允许直接退群</span>
+          <el-tooltip raw-content content="默认关闭。开启后用户无需@骰娘即可执行退群指令">
+            <el-icon><question-filled /></el-icon>
+          </el-tooltip>
+        </div>
+      </template>
+      <el-checkbox v-model="config.botExitWithoutAt" label="开启" />
     </el-form-item>
 
     <el-form-item>
@@ -474,6 +487,18 @@
     <el-form-item>
       <template #label>
         <div>
+          <span>制卡使用合并转发</span>
+          <el-tooltip raw-content content="开启后，.coc 的结果会尝试以“合并转发”格式发送">
+            <el-icon><question-filled /></el-icon>
+          </el-tooltip>
+        </div>
+      </template>
+      <el-checkbox v-model="config.cocCardMergeForward" label="开启" />
+    </el-form-item>
+
+    <el-form-item>
+      <template #label>
+        <div>
           <span>骰点轮数上限</span>
           <el-tooltip raw-content content=".r n#中n的最大值，1-25之间，默认12">
             <el-icon><question-filled /></el-icon>
@@ -562,6 +587,20 @@
         type="number"
         style="width: auto"
         :placeholder="'不活跃N天后自动退出'" />
+    </el-form-item>
+
+    <el-form-item>
+      <template #label>
+        <div>
+          <span>自动退群简报</span>
+          <el-tooltip
+            raw-content
+            content="此开关打开时，仅有自动退群任务开始执行与执行全部结束会发送自动退群通知">
+            <el-icon><question-filled /></el-icon>
+          </el-tooltip>
+        </div>
+      </template>
+      <el-checkbox v-model="config.quitInactiveNoticeSummaryMode" label="开启" />
     </el-form-item>
 
     <el-form-item label="退群批次大小">
@@ -779,6 +818,10 @@ const submit = async () => {
 
   if (mod.logSizeNoticeCount) {
     mod.logSizeNoticeCount = toNumber(mod.logSizeNoticeCount);
+  }
+
+  if (mod.ignoreUnaddressedBotCmd) {
+    mod.botExitWithoutAt = false;
   }
 
   await store.diceConfigSet(mod);

@@ -143,10 +143,6 @@
             </el-space>
           </el-form-item>
 
-          <el-form-item label="在线时长">
-            <div>{{ i.onlineTotalTime }} 未实现</div>
-          </el-form-item>
-
           <el-form-item label="群组数量">
             <div>{{ i.groupNum }}</div>
           </el-form-item>
@@ -175,8 +171,10 @@
           <template
             v-if="
               i.platform === 'QQ' &&
-              (i.protocolType === 'onebot' || i.protocolType === 'walle-q') &&
-              i.adapter.builtinMode === 'gocq'
+              (i.protocolType === 'onebot' ||
+                i.protocolType === 'walle-q' ||
+                i.protocolType === 'milky') &&
+              (i.adapter.builtinMode === 'gocq' || !i.adapter.builtinMode)
             ">
             <!-- <el-form-item label="忽略好友请求">
               <div>{{i.adapter?.ignoreFriendRequest ? '是' : '否'}}</div>
@@ -191,12 +189,6 @@
               <div v-if="i.adapter?.inPackGoCqHttpProtocol === 5">iPad</div>
               <div v-if="i.adapter?.inPackGoCqHttpProtocol === 6">AndroidPad</div>
               <!-- <el-button type="primary" class="btn-add" :icon="Plus" circle @click="addOne"></el-button> -->
-              <el-button
-                size="small"
-                type="primary"
-                style="margin-left: 1rem"
-                :icon="Edit"
-                @click="askSetData(i)"></el-button>
             </el-form-item>
             <el-form-item v-if="i.adapter.useInPackGoCqhttp" label="协议版本">
               <div v-if="i.adapter?.inPackGoCqHttpAppVersion === ''">未指定</div>
@@ -205,6 +197,11 @@
                   i.adapter?.inPackGoCqHttpAppVersion && i.adapter.inPackGoCqHttpAppVersion !== ''
                 ">
                 {{ i.adapter.inPackGoCqHttpAppVersion }}
+              </div>
+            </el-form-item>
+            <el-form-item v-if="i.protocolType" label="协议类型">
+              <div>
+                {{ i.protocolType }}
               </div>
             </el-form-item>
             <el-form-item v-if="i.adapter.useInPackGoCqhttp" label="协议实现">
@@ -218,8 +215,23 @@
             <el-form-item v-else-if="i.adapter?.isReverse" label="特殊">
               <div>反向 WS</div>
             </el-form-item>
+            <el-form-item v-else-if="i.adapter?.built_in_mode" label="特殊">
+              <div>{{ i.adapter?.built_in_mode }}</div>
+              <el-button
+                size="small"
+                type="primary"
+                style="margin-left: 1rem"
+                :icon="Edit"
+                @click="askSetDataGocq(i)"></el-button>
+            </el-form-item>
             <el-form-item v-else label="特殊">
               <div>分离部署</div>
+              <el-button
+                size="small"
+                type="primary"
+                style="margin-left: 1rem"
+                :icon="Edit"
+                @click="askSetDataGocq(i)"></el-button>
             </el-form-item>
           </template>
 
@@ -354,7 +366,11 @@
         }}</el-checkbox>
       </el-form-item>
 
-      <el-form-item label="协议" :label-width="formLabelWidth" required>
+      <el-form-item
+        label="协议"
+        :label-width="formLabelWidth"
+        required
+        v-if="form.endpoint.adapter?.useInPackGoCqhttp">
         <el-select v-model="form.protocol">
           <!-- <el-option label="iPad 协议" :value="0"></el-option> -->
           <el-option label="Android 协议 - 稳定协议，建议！" :value="1"></el-option>
@@ -728,26 +744,11 @@
         如果你依然需要使用 gocq，可以切换到分离部署方式进行连接，但我们非常不建议您再继续使用 gocq。
       </el-alert>
       <el-alert
-        v-if="
-          store.diceServers.length > 0 &&
-          store.diceServers[0].baseInfo.containerMode &&
-          (form.accountType === 15 || form.accountType === 0)
-        "
+        v-if="isContainerMode() && isBuiltinAccountType(form.accountType)"
         type="warning"
         :closable="false"
         class="mb-6">
         当前为容器模式，内置客户端被禁用。
-      </el-alert>
-      <el-alert
-        v-if="
-          store.diceServers.length > 0 &&
-          store.diceServers[0].baseInfo.containerMode &&
-          (form.accountType === 16 || form.accountType === 0)
-        "
-        type="warning"
-        :closable="false"
-        class="mb-6">
-        当前为容器模式，内置 gocq 被禁用。
       </el-alert>
 
       <el-form :model="form">
@@ -755,34 +756,41 @@
           <el-select v-model="form.accountType">
             <el-option
               label="QQ(内置客户端)"
-              :value="15"
+              :value="ImConnectionTypeLagrangeOnebot"
               :disabled="
                 store.diceServers.length > 0 && store.diceServers[0].baseInfo.containerMode
               "></el-option>
+            <el-option label="QQ(Milky)" :value="ImConnectionTypeMilkySeparate"></el-option>
             <el-option
-              label="QQ(内置gocq)"
-              :value="16"
-              :disabled="
-                store.diceServers.length > 0 && store.diceServers[0].baseInfo.containerMode
-              "></el-option>
-            <el-option label="QQ(onebot11正向WS)" :value="6"></el-option>
-            <el-option label="QQ(onebot11反向WS)" :value="11"></el-option>
-            <el-option label="QQ(官方机器人)" :value="10"></el-option>
-            <el-option label="[WIP]Satori" :value="14"></el-option>
-            <el-option label="[WIP]SealChat" :value="13"></el-option>
-            <el-option label="Discord" :value="1"></el-option>
-            <el-option label="KOOK(开黑啦)" :value="2"></el-option>
-            <el-option label="Telegram" :value="3"></el-option>
-            <el-option label="Minecraft服务器(Paper)" :value="4"></el-option>
-            <el-option label="Dodo语音" :value="5"></el-option>
-            <el-option label="钉钉" :value="8"></el-option>
-            <el-option label="Slack" :value="9"></el-option>
-            <el-option label="[已弃用]QQ(red协议)" :value="7"></el-option>
+              label="QQ(内置Lagrange.Milky)"
+              :value="ImConnectionTypeMilkyInternalLagrange"
+              :disabled="isContainerMode()"></el-option>
+            <el-option
+              label="QQ(内置Yogurt)"
+              :value="ImConnectionTypeMilkyInternalYogurt"
+              :disabled="isContainerMode()"></el-option>
+            <el-option
+              label="QQ(onebot11正向WS)"
+              :value="ImConnectionTypeOnebotSeparate"></el-option>
+            <el-option
+              label="QQ(onebot11反向WS)"
+              :value="ImConnectionTypeOnebotReverse"></el-option>
+            <el-option label="QQ(官方机器人)" :value="ImConnectionTypeOfficialQQ"></el-option>
+            <el-option label="[WIP]Satori" :value="ImConnectionTypeSatori"></el-option>
+            <el-option label="[WIP]SealChat" :value="ImConnectionTypeSealChat"></el-option>
+            <el-option label="Discord" :value="ImConnectionTypeDiscord"></el-option>
+            <el-option label="KOOK(开黑啦)" :value="ImConnectionTypeKook"></el-option>
+            <el-option label="Telegram" :value="ImConnectionTypeTelegram"></el-option>
+            <el-option label="Minecraft服务器" :value="ImConnectionTypeMinecraft"></el-option>
+            <el-option label="Dodo语音" :value="ImConnectionTypeDodo"></el-option>
+            <el-option label="钉钉" :value="ImConnectionTypeDingTalk"></el-option>
+            <el-option label="Slack" :value="ImConnectionTypeSlack"></el-option>
+            <el-option label="[已弃用]QQ(red协议)" :value="ImConnectionTypeRed"></el-option>
           </el-select>
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 0"
+          v-if="form.accountType === ImConnectionTypeGocqLegacy"
           label="设备"
           :label-width="formLabelWidth"
           required>
@@ -801,7 +809,10 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 0 && (form.protocol === 1 || form.protocol === 6)"
+          v-if="
+            form.accountType === ImConnectionTypeGocqLegacy &&
+            (form.protocol === 1 || form.protocol === 6)
+          "
           :label-width="formLabelWidth">
           <template #label>
             <div style="display: flex; align-items: center">
@@ -829,14 +840,14 @@
         </el-form-item> -->
 
         <el-form-item
-          v-if="form.accountType === 15 || form.accountType === 16"
+          v-if="form.accountType === ImConnectionTypeLagrangeOnebot"
           label="账号"
           :label-width="formLabelWidth"
           required>
           <el-input v-model="form.account" type="number" autocomplete="off"></el-input>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 15 || form.accountType === 16"
+          v-if="form.accountType === ImConnectionTypeLagrangeOnebot"
           label="签名版本"
           :label-width="formLabelWidth"
           required>
@@ -885,7 +896,7 @@
           }}</el-text>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 15 || form.accountType === 16"
+          v-if="form.accountType === ImConnectionTypeLagrangeOnebot"
           label="签名服务"
           :label-width="formLabelWidth"
           required>
@@ -965,14 +976,24 @@
           }}</el-text>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 0"
+          v-if="
+            form.accountType === ImConnectionTypeGocqLegacy ||
+            isInternalMilkyAccountType(form.accountType)
+          "
           label="账号"
           :label-width="formLabelWidth"
           required>
           <el-input v-model="form.account" type="number" autocomplete="off"></el-input>
+          <small v-if="isInternalMilkyAccountType(form.accountType)">
+            <div style="color: #aa4422">输入的 QQ 账号务必是你即将扫码登录的账号</div>
+            <div style="color: #aa4422">否则登录会失败</div>
+          </small>
         </el-form-item>
 
-        <el-form-item v-if="form.accountType === 0" label="密码" :label-width="formLabelWidth">
+        <el-form-item
+          v-if="form.accountType === ImConnectionTypeGocqLegacy"
+          label="密码"
+          :label-width="formLabelWidth">
           <el-input v-model="form.password" type="password" autocomplete="off"></el-input>
           <small>
             <div>提示：新设备首次登录多半需要手机版扫码，建议先准备好</div>
@@ -1001,7 +1022,10 @@
         </el-form-item> -->
 
         <el-form-item
-          v-if="form.accountType === 0 && (form.protocol === 1 || form.protocol === 6)"
+          v-if="
+            form.accountType === ImConnectionTypeGocqLegacy &&
+            (form.protocol === 1 || form.protocol === 6)
+          "
           :label-width="formLabelWidth">
           <template #label>
             <div style="display: flex; align-items: center">
@@ -1023,7 +1047,7 @@
         </el-form-item>
         <el-form-item
           v-if="
-            form.accountType === 0 &&
+            form.accountType === ImConnectionTypeGocqLegacy &&
             (form.protocol === 1 || form.protocol === 6) &&
             signConfigType === 'simple'
           "
@@ -1037,7 +1061,7 @@
         </el-form-item>
         <el-form-item
           v-if="
-            form.accountType === 0 &&
+            form.accountType === ImConnectionTypeGocqLegacy &&
             (form.protocol === 1 || form.protocol === 6) &&
             signConfigType === 'simple'
           "
@@ -1051,7 +1075,7 @@
         </el-form-item>
         <el-form-item
           v-if="
-            form.accountType === 0 &&
+            form.accountType === ImConnectionTypeGocqLegacy &&
             (form.protocol === 1 || form.protocol === 6) &&
             signConfigType === 'simple'
           "
@@ -1066,7 +1090,7 @@
 
         <el-form-item
           v-if="
-            form.accountType === 0 &&
+            form.accountType === ImConnectionTypeGocqLegacy &&
             (form.protocol === 1 || form.protocol === 6) &&
             signConfigType === 'advanced'
           ">
@@ -1076,7 +1100,7 @@
         </el-form-item>
         <el-form-item
           v-if="
-            form.accountType === 0 &&
+            form.accountType === ImConnectionTypeGocqLegacy &&
             (form.protocol === 1 || form.protocol === 6) &&
             signConfigType === 'advanced'
           ">
@@ -1113,7 +1137,7 @@
         </el-form-item>
         <el-form-item
           v-if="
-            form.accountType === 0 &&
+            form.accountType === ImConnectionTypeGocqLegacy &&
             (form.protocol === 1 || form.protocol === 6) &&
             signConfigType === 'advanced'
           "
@@ -1143,7 +1167,7 @@
         </el-form-item>
         <el-form-item
           v-if="
-            form.accountType === 0 &&
+            form.accountType === ImConnectionTypeGocqLegacy &&
             (form.protocol === 1 || form.protocol === 6) &&
             signConfigType === 'advanced'
           "
@@ -1172,7 +1196,7 @@
         </el-form-item>
         <el-form-item
           v-if="
-            form.accountType === 0 &&
+            form.accountType === ImConnectionTypeGocqLegacy &&
             (form.protocol === 1 || form.protocol === 6) &&
             signConfigType === 'advanced'
           "
@@ -1197,7 +1221,7 @@
         </el-form-item>
         <el-form-item
           v-if="
-            form.accountType === 0 &&
+            form.accountType === ImConnectionTypeGocqLegacy &&
             (form.protocol === 1 || form.protocol === 6) &&
             signConfigType === 'advanced'
           "
@@ -1227,7 +1251,7 @@
         </el-form-item>
         <el-form-item
           v-if="
-            form.accountType === 0 &&
+            form.accountType === ImConnectionTypeGocqLegacy &&
             (form.protocol === 1 || form.protocol === 6) &&
             signConfigType === 'advanced'
           "
@@ -1253,7 +1277,7 @@
         </el-form-item>
         <el-form-item
           v-if="
-            form.accountType === 0 &&
+            form.accountType === ImConnectionTypeGocqLegacy &&
             (form.protocol === 1 || form.protocol === 6) &&
             signConfigType === 'advanced'
           "
@@ -1281,7 +1305,7 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 6"
+          v-if="form.accountType === ImConnectionTypeOnebotSeparate"
           label="账号"
           :label-width="formLabelWidth"
           required>
@@ -1289,7 +1313,7 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 6"
+          v-if="form.accountType === ImConnectionTypeOnebotSeparate"
           label="连接地址"
           :label-width="formLabelWidth"
           required>
@@ -1299,7 +1323,10 @@
             type="text"
             autocomplete="off"></el-input>
         </el-form-item>
-        <el-form-item v-if="form.accountType === 6" label="访问令牌" :label-width="formLabelWidth">
+        <el-form-item
+          v-if="form.accountType === ImConnectionTypeOnebotSeparate"
+          label="访问令牌"
+          :label-width="formLabelWidth">
           <el-input
             v-model="form.accessToken"
             placeholder="gocqhttp配置的access token，没有不用填写"
@@ -1308,14 +1335,14 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 11"
+          v-if="form.accountType === ImConnectionTypeOnebotReverse"
           label="账号"
           :label-width="formLabelWidth"
           required>
           <el-input v-model="form.account" type="number" autocomplete="off"></el-input>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 11"
+          v-if="form.accountType === ImConnectionTypeOnebotReverse"
           label="连接地址"
           :label-width="formLabelWidth"
           required>
@@ -1327,7 +1354,7 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 13"
+          v-if="form.accountType === ImConnectionTypeSealChat"
           label="连接地址"
           :label-width="formLabelWidth"
           required>
@@ -1338,7 +1365,7 @@
             autocomplete="off"></el-input>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 13"
+          v-if="form.accountType === ImConnectionTypeSealChat"
           label="Token"
           :label-width="formLabelWidth"
           required>
@@ -1350,7 +1377,7 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 14"
+          v-if="form.accountType === ImConnectionTypeSatori"
           label="平台"
           :label-width="formLabelWidth"
           required>
@@ -1359,7 +1386,7 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 14"
+          v-if="form.accountType === ImConnectionTypeSatori"
           label="主机"
           :label-width="formLabelWidth"
           required>
@@ -1370,7 +1397,7 @@
             autocomplete="off"></el-input>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 14"
+          v-if="form.accountType === ImConnectionTypeSatori"
           label="端口"
           :label-width="formLabelWidth"
           required>
@@ -1379,7 +1406,10 @@
             placeholder="如 5500"
             autocomplete="off"></el-input-number>
         </el-form-item>
-        <el-form-item v-if="form.accountType === 14" label="Token" :label-width="formLabelWidth">
+        <el-form-item
+          v-if="form.accountType === ImConnectionTypeSatori"
+          label="Token"
+          :label-width="formLabelWidth">
           <el-input
             v-model="form.token"
             type="text"
@@ -1388,7 +1418,7 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 7"
+          v-if="form.accountType === ImConnectionTypeRed"
           label="主机"
           :label-width="formLabelWidth"
           required>
@@ -1399,7 +1429,7 @@
             autocomplete="off"></el-input>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 7"
+          v-if="form.accountType === ImConnectionTypeRed"
           label="端口"
           :label-width="formLabelWidth"
           required>
@@ -1409,7 +1439,7 @@
             autocomplete="off"></el-input-number>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 7"
+          v-if="form.accountType === ImConnectionTypeRed"
           label="令牌"
           :label-width="formLabelWidth"
           required>
@@ -1421,7 +1451,7 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 10"
+          v-if="form.accountType === ImConnectionTypeOfficialQQ"
           label="机器人ID"
           :label-width="formLabelWidth"
           required>
@@ -1432,7 +1462,7 @@
             type="number"></el-input>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 10"
+          v-if="form.accountType === ImConnectionTypeOfficialQQ"
           label="机器人令牌"
           :label-width="formLabelWidth"
           required>
@@ -1443,7 +1473,7 @@
             autocomplete="off"></el-input>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 10"
+          v-if="form.accountType === ImConnectionTypeOfficialQQ"
           label="机器人密钥"
           :label-width="formLabelWidth"
           required>
@@ -1454,14 +1484,16 @@
             autocomplete="off"></el-input>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 10"
+          v-if="form.accountType === ImConnectionTypeOfficialQQ"
           label="只在频道使用"
           :label-width="formLabelWidth"
           required>
           <el-switch v-model="form.onlyQQGuild" />
         </el-form-item>
 
-        <el-form-item v-if="form.accountType === 10" :label-width="formLabelWidth">
+        <el-form-item
+          v-if="form.accountType === ImConnectionTypeOfficialQQ"
+          :label-width="formLabelWidth">
           <small>
             <div>提示：进入腾讯开放平台创建一个机器人</div>
             <div>https://q.qq.com/#/app/bot</div>
@@ -1471,7 +1503,7 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 1"
+          v-if="form.accountType === ImConnectionTypeDiscord"
           label="Token"
           :label-width="formLabelWidth"
           required>
@@ -1485,7 +1517,7 @@
           </small>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 1"
+          v-if="form.accountType === ImConnectionTypeDiscord"
           label="http 代理地址"
           :label-width="formLabelWidth">
           <el-input
@@ -1495,7 +1527,7 @@
             placeholder="例：http://127.0.0.1:7890" />
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 1"
+          v-if="form.accountType === ImConnectionTypeDiscord"
           label="反向代理地址"
           :label-width="formLabelWidth">
           <el-input
@@ -1515,7 +1547,7 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 2"
+          v-if="form.accountType === ImConnectionTypeKook"
           label="Token"
           :label-width="formLabelWidth"
           required>
@@ -1529,7 +1561,7 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 3"
+          v-if="form.accountType === ImConnectionTypeTelegram"
           label="Token"
           :label-width="formLabelWidth"
           required>
@@ -1544,7 +1576,7 @@
           </small>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 3"
+          v-if="form.accountType === ImConnectionTypeTelegram"
           label="http 代理地址"
           :label-width="formLabelWidth">
           <el-input
@@ -1555,23 +1587,72 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 4"
+          v-if="form.accountType === ImConnectionTypeMinecraft"
           label="Url"
           :label-width="formLabelWidth"
           required>
           <el-input v-model="form.url" type="string" autocomplete="off"></el-input>
           <small>
-            <div>提示：前往 https://github.com/sealdice/sealdice-minecraft/releases/latest</div>
-            <div>下载最新的 mc 插件然后安装在 mc 服务器中</div>
-            <div>按照 ip:端口 的格式写在框里，默认端口 8887</div>
-            <div>
-              详细的使用说明请阅读 Readme (https://github.com/sealdice/sealdice-minecraft#readme)
-            </div>
+            <div><strong>提示</strong></div>
+            <ul style="margin: 0.25rem 0 0 1.2rem; padding: 0">
+              <li>地址请按 ip:端口 格式填写，默认端口 8887。</li>
+            </ul>
+            <div style="margin-top: 0.35rem"><strong>Paper端 配置方法</strong></div>
+            <ul style="margin: 0.25rem 0 0 1.2rem; padding: 0">
+              <li>
+                前往
+                <a
+                  href="https://github.com/sealdice/sealdice-minecraft/releases/latest"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >GitHub Releases</a
+                >
+                下载最新 mc 插件，并安装到 mc 服务器中。
+              </li>
+              <li>
+                详细使用说明：
+                <a
+                  href="https://github.com/sealdice/sealdice-minecraft#readme"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >ReadMe</a
+                >
+              </li>
+            </ul>
+            <div style="margin-top: 0.35rem"><strong>fabric/(neo)forge端 配置方法</strong></div>
+            <ul style="margin: 0.25rem 0 0 1.2rem; padding: 0">
+              <li>
+                从
+                <a
+                  href="https://www.curseforge.com/minecraft/mc-mods/sealdice2mc"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >CurseForge</a
+                >
+                或
+                <a
+                  href="https://modrinth.com/mod/sealdice2mc"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Modrinth</a
+                >
+                下载 SealDice2MC 模组，安装在服务端（或局域网联机的主机端）。
+              </li>
+              <li>
+                详细使用说明：
+                <a
+                  href="https://github.com/Dontplay0112/Sealdice2MC#readme"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >ReadMe</a
+                >
+              </li>
+            </ul>
           </small>
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 5"
+          v-if="form.accountType === ImConnectionTypeDodo"
           label="ClientID"
           :label-width="formLabelWidth"
           required>
@@ -1579,7 +1660,7 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 5"
+          v-if="form.accountType === ImConnectionTypeDodo"
           label="Token"
           :label-width="formLabelWidth"
           required>
@@ -1592,7 +1673,10 @@
           </small>
         </el-form-item>
 
-        <el-form-item v-if="form.accountType === 8" label="昵称" :label-width="formLabelWidth">
+        <el-form-item
+          v-if="form.accountType === ImConnectionTypeDingTalk"
+          label="昵称"
+          :label-width="formLabelWidth">
           <el-input
             v-model="form.nickname"
             type="string"
@@ -1607,7 +1691,7 @@
           <el-input v-model="form.clientID" type="string" autocomplete="off"></el-input>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 8"
+          v-if="form.accountType === ImConnectionTypeDingTalk"
           label="RobotCode"
           :label-width="formLabelWidth"
           required>
@@ -1615,7 +1699,7 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 8"
+          v-if="form.accountType === ImConnectionTypeDingTalk"
           label="Token"
           :label-width="formLabelWidth"
           required>
@@ -1633,14 +1717,14 @@
         </el-form-item>
 
         <el-form-item
-          v-if="form.accountType === 9"
+          v-if="form.accountType === ImConnectionTypeSlack"
           label="AppToken"
           :label-width="formLabelWidth"
           required>
           <el-input v-model="form.appToken" type="string" autocomplete="off"></el-input>
         </el-form-item>
         <el-form-item
-          v-if="form.accountType === 9"
+          v-if="form.accountType === ImConnectionTypeSlack"
           label="BotToken"
           :label-width="formLabelWidth"
           required>
@@ -1664,6 +1748,35 @@
           </small>
         </el-form-item>
       </el-form>
+
+      <el-form-item
+        v-if="form.accountType === ImConnectionTypeMilkySeparate"
+        label="Token"
+        :label-width="formLabelWidth">
+        <el-input v-model="form.token" type="string" autocomplete="off"></el-input>
+      </el-form-item>
+      <el-form-item
+        v-if="form.accountType === ImConnectionTypeMilkySeparate"
+        label="Websocket Gateway"
+        :label-width="formLabelWidth"
+        required>
+        <el-input
+          v-model="form.wsGateway"
+          type="string"
+          autocomplete="off"
+          placeholder="ws://127.0.0.1:3000/event"></el-input>
+      </el-form-item>
+      <el-form-item
+        v-if="form.accountType === ImConnectionTypeMilkySeparate"
+        label="REST Gateway"
+        :label-width="formLabelWidth"
+        required>
+        <el-input
+          v-model="form.restGateway"
+          type="string"
+          autocomplete="off"
+          placeholder="http://127.0.0.1:3000/api"></el-input>
+      </el-form-item>
     </template>
     <template v-else-if="form.step === 2">
       <el-timeline style="min-height: 260px">
@@ -1813,23 +1926,33 @@
           <el-button
             type="primary"
             :disabled="
-              form.accountType === 0 ||
-              ((form.accountType === 1 || form.accountType === 2 || form.accountType === 3) &&
+              form.accountType === ImConnectionTypeGocqLegacy ||
+              ((form.accountType === ImConnectionTypeDiscord ||
+                form.accountType === ImConnectionTypeKook ||
+                form.accountType === ImConnectionTypeTelegram) &&
                 form.token === '') ||
-              (form.accountType === 4 && form.url === '') ||
-              (form.accountType === 5 && (form.clientID === '' || form.token === '')) ||
-              (form.accountType === 8 &&
+              (form.accountType === ImConnectionTypeMinecraft && form.url === '') ||
+              (form.accountType === ImConnectionTypeDodo &&
+                (form.clientID === '' || form.token === '')) ||
+              (form.accountType === ImConnectionTypeDingTalk &&
                 (form.clientID === '' || form.token === '' || form.robotCode === '')) ||
-              (form.accountType === 6 && (form.account === '' || form.connectUrl === '')) ||
-              (form.accountType === 7 &&
+              (form.accountType === ImConnectionTypeOnebotSeparate &&
+                (form.account === '' || form.connectUrl === '')) ||
+              (form.accountType === ImConnectionTypeRed &&
                 (form.host === '' || form.port === '' || form.token === '')) ||
-              (form.accountType === 9 && (form.botToken === '' || form.appToken === '')) ||
-              (form.accountType === 11 && (form.account === '' || form.reverseAddr === '')) ||
-              (form.accountType === 13 && (form.token === '' || form.url === '')) ||
-              ((form.accountType === 15 || form.accountType === 16) &&
+              (form.accountType === ImConnectionTypeSlack &&
+                (form.botToken === '' || form.appToken === '')) ||
+              (form.accountType === ImConnectionTypeOnebotReverse &&
+                (form.account === '' || form.reverseAddr === '')) ||
+              (form.accountType === ImConnectionTypeSealChat &&
+                (form.token === '' || form.url === '')) ||
+              (form.accountType === ImConnectionTypeLagrangeOnebot &&
                 (form.account === '' ||
                   form.signServerVersion === '' ||
-                  form.signServerName === ''))
+                  form.signServerName === '')) ||
+              (form.accountType === ImConnectionTypeMilkySeparate &&
+                (form.wsGateway === '' || form.restGateway === '')) ||
+              (isInternalMilkyAccountType(form.accountType) && form.account === '')
             "
             @click="goStepTwo">
             下一步</el-button
@@ -1886,7 +2009,28 @@
 
 <script lang="ts" setup>
 import { reactive } from 'vue';
-import { useStore, goCqHttpStateCode } from '~/store';
+import {
+  useStore,
+  goCqHttpStateCode,
+  ImConnectionTypeGocqLegacy,
+  ImConnectionTypeDiscord,
+  ImConnectionTypeKook,
+  ImConnectionTypeTelegram,
+  ImConnectionTypeMinecraft,
+  ImConnectionTypeDodo,
+  ImConnectionTypeOnebotSeparate,
+  ImConnectionTypeRed,
+  ImConnectionTypeDingTalk,
+  ImConnectionTypeSlack,
+  ImConnectionTypeOnebotReverse,
+  ImConnectionTypeSealChat,
+  ImConnectionTypeLagrangeOnebot,
+  ImConnectionTypeMilkySeparate,
+  ImConnectionTypeMilkyInternalLagrange,
+  ImConnectionTypeMilkyInternalYogurt,
+  ImConnectionTypeOfficialQQ,
+  ImConnectionTypeSatori,
+} from '~/store';
 import type { DiceConnection } from '~/store';
 import { Plus, Edit, QuestionFilled, Delete } from '@element-plus/icons-vue';
 import { sleep } from '~/utils';
@@ -1949,6 +2093,25 @@ const activities = ref([] as typeof fullActivities);
 
 const store = useStore();
 const curCaptchaIdSet = ref(''); // 当前设置了 ticket 的 id
+
+const isContainerMode = () => {
+  return store.diceServers.length > 0 && store.diceServers[0].baseInfo.containerMode;
+};
+
+const isInternalMilkyAccountType = (accountType: number) => {
+  return (
+    accountType === ImConnectionTypeMilkyInternalLagrange ||
+    accountType === ImConnectionTypeMilkyInternalYogurt
+  );
+};
+
+const isBuiltinAccountType = (accountType: number) => {
+  return (
+    accountType === ImConnectionTypeLagrangeOnebot ||
+    accountType === ImConnectionTypeGocqLegacy ||
+    isInternalMilkyAccountType(accountType)
+  );
+};
 
 const isRecentLogin = ref(false);
 const duringRelogin = ref(false);
@@ -2168,7 +2331,7 @@ const setEnable = async (i: DiceConnection, val: boolean) => {
   }
 };
 
-const askSetData = async (i: DiceConnection) => {
+const askSetDataGocq = async (i: DiceConnection) => {
   form.protocol = i.adapter?.inPackGoCqHttpProtocol;
   form.appVersion = i.adapter?.inPackGoCqHttpAppVersion;
   form.ignoreFriendRequest = i.adapter?.ignoreFriendRequest;
@@ -2456,6 +2619,11 @@ const form = reactive({
 
   reverseAddr: ':4001',
   platform: 'QQ',
+  // milky
+  wsGateway: '',
+  restGateway: '',
+  // milky builtin
+  builtInMode: '',
 });
 
 export type addImConnectionForm = typeof form;
